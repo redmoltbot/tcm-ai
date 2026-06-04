@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { straicoChat } from '@/lib/straico';
 import { getMarkSystemPrompt } from '@/lib/mark-system-prompt';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { getHistory, appendMessages } from '@/lib/session';
 
 export async function POST(request: NextRequest) {
   try {
-    const { history, userMessage } = await request.json() as { history: Message[]; userMessage: string };
+    const { sessionId, userMessage } = await request.json();
+
+    const history = sessionId ? await getHistory(sessionId, 8) : [];
     const content = await straicoChat(history, userMessage, getMarkSystemPrompt());
+
+    if (sessionId) {
+      await appendMessages(sessionId, [
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: content },
+      ]);
+    }
+
     return NextResponse.json({ role: 'assistant', content });
   } catch (error) {
     console.error('Chat API error:', error instanceof Error ? error.message : error);
